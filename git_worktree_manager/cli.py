@@ -8,7 +8,14 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
-from .git_ops import GitOperations, GitRepositoryError
+from .git_ops import GitOperations
+from .exceptions import (
+    GitRepositoryError,
+    WorktreeError,
+    WorktreeCreationError,
+    ConfigError,
+    not_git_repository_error
+)
 
 
 console = Console()
@@ -141,25 +148,280 @@ def create(ctx: click.Context) -> None:
 
 
 @cli.command()
+@click.option('--diff', is_flag=True, help='Show diff summaries for each worktree')
+@click.option('--details', is_flag=True, help='Show detailed information for each worktree')
 @click.pass_context
-def list(ctx: click.Context) -> None:
+def list(ctx: click.Context, diff: bool, details: bool) -> None:
     """List all worktrees with comprehensive status information.
     
     Shows all existing worktrees with their branch names, commit information,
     file paths, and change status.
     """
-    console.print("[yellow]Worktree listing command - Coming in next task![/yellow]")
+    from .worktree_manager import WorktreeManager
+    from .git_ops import GitRepositoryError
+    
+    try:
+        # Initialize WorktreeManager
+        worktree_manager = WorktreeManager()
+        
+        console.print(
+            Panel(
+                "[bold blue]Git Worktrees[/bold blue]\n\n"
+                "Listing all worktrees in this repository with status information.",
+                title="Worktree List",
+                border_style="blue"
+            )
+        )
+        
+        # Get worktree list
+        console.print("[dim]Loading worktree information...[/dim]")
+        worktrees = worktree_manager.list_worktrees()
+        
+        if not worktrees:
+            console.print(
+                Panel(
+                    "[yellow]No worktrees found in this repository.[/yellow]\n\n"
+                    "Use [cyan]create[/cyan] command to create your first worktree.",
+                    title="No Worktrees",
+                    border_style="yellow"
+                )
+            )
+            return
+        
+        # Display worktree summary
+        worktree_manager.ui_controller.display_worktree_summary(worktrees)
+        console.print()
+        
+        # Display worktree list
+        worktree_manager.ui_controller.display_worktree_list(worktrees)
+        
+        # Show detailed information if requested
+        if details:
+            console.print()
+            console.print("[bold]Detailed Information:[/bold]")
+            for worktree in worktrees:
+                console.print()
+                worktree_manager.ui_controller.display_worktree_details(worktree)
+        
+        # Show diff summaries if requested
+        if diff:
+            console.print()
+            console.print("[bold]Diff Summaries:[/bold]")
+            for worktree in worktrees:
+                console.print()
+                try:
+                    diff_summary = worktree_manager.calculate_diff_summary(worktree)
+                    if diff_summary:
+                        worktree_manager.ui_controller.display_diff_summary(
+                            diff_summary, 
+                            worktree.branch, 
+                            worktree.base_branch or "unknown"
+                        )
+                    else:
+                        console.print(f"[dim]No diff information available for {worktree.branch}[/dim]")
+                except GitRepositoryError as e:
+                    console.print(f"[red]Error calculating diff for {worktree.branch}: {e}[/red]")
+        
+    except GitRepositoryError as e:
+        console.print(
+            Panel(
+                f"[red]Git operation failed:[/red]\n\n{e}",
+                title="Git Error",
+                border_style="red"
+            )
+        )
+        ctx.exit(1)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Worktree listing cancelled by user.[/yellow]")
+        ctx.exit(1)
+    except Exception as e:
+        console.print(
+            Panel(
+                f"[red]Unexpected error:[/red]\n\n{e}",
+                title="Error",
+                border_style="red"
+            )
+        )
+        ctx.exit(1)
 
 
 @cli.command()
+@click.option('--show', is_flag=True, help='Show current configuration without making changes')
+@click.option('--reset', is_flag=True, help='Reset configuration to defaults')
 @click.pass_context
-def configure(ctx: click.Context) -> None:
+def configure(ctx: click.Context, show: bool, reset: bool) -> None:
     """Configure worktree preferences interactively.
     
     Set default worktree storage locations and other preferences that will
     be persisted across sessions.
     """
-    console.print("[yellow]Configuration command - Coming in next task![/yellow]")
+    from .config import ConfigManager, ConfigError
+    from rich.prompt import Prompt, Confirm
+    
+    try:
+        # Initialize ConfigManager
+        config_manager = ConfigManager()
+        
+        console.print(
+            Panel(
+                "[bold blue]Worktree Configuration[/bold blue]\n\n"
+                "Configure default settings for Git worktree management.",
+                title="Configuration",
+                border_style="blue"
+            )
+        )
+        
+        # Show current configuration if requested
+        if show:
+            try:
+                current_config = config_manager.load_user_preferences()
+                default_location = config_manager.get_default_worktree_location()
+                
+                console.print()
+                console.print("[bold]Current Configuration:[/bold]")
+                console.print(f"Default Worktree Location: [cyan]{default_location}[/cyan]")
+                
+                if current_config:
+                    console.print()
+                    console.print("[bold]All Settings:[/bold]")
+                    for key, value in current_config.items():
+                        console.print(f"  {key}: [dim]{value}[/dim]")
+                else:
+                    console.print("[dim]No custom configuration found (using defaults)[/dim]")
+                
+                return
+                
+            except ConfigError as e:
+                console.print(f"[red]Error loading configuration: {e}[/red]")
+                ctx.exit(1)
+        
+        # Reset configuration if requested
+        if reset:
+            if Confirm.ask(
+                "[yellow]Are you sure you want to reset all configuration to defaults?[/yellow]",
+                default=False,
+                console=console
+            ):
+                try:
+                    # Reset by saving empty preferences
+                    config_manager.save_user_preferences({})
+                    console.print(
+                        Panel(
+                            "[green]Configuration reset to defaults successfully![/green]",
+                            title="Reset Complete",
+                            border_style="green"
+                        )
+                    )
+                    return
+                except ConfigError as e:
+                    console.print(f"[red]Error resetting configuration: {e}[/red]")
+                    ctx.exit(1)
+            else:
+                console.print("[yellow]Configuration reset cancelled.[/yellow]")
+                return
+        
+        # Interactive configuration setup
+        console.print()
+        console.print("[bold]Interactive Configuration Setup[/bold]")
+        console.print("[dim]Press Ctrl+C at any time to cancel[/dim]")
+        
+        # Get current settings
+        try:
+            current_location = config_manager.get_default_worktree_location()
+            current_prefs = config_manager.load_user_preferences()
+        except ConfigError as e:
+            console.print(f"[red]Error loading current configuration: {e}[/red]")
+            ctx.exit(1)
+        
+        console.print()
+        console.print(f"[bold]Current default worktree location:[/bold] [cyan]{current_location}[/cyan]")
+        
+        # Prompt for new default location
+        if Confirm.ask(
+            "Would you like to change the default worktree location?",
+            default=False,
+            console=console
+        ):
+            while True:
+                try:
+                    new_location = Prompt.ask(
+                        "[cyan]Enter new default worktree location[/cyan]",
+                        default=current_location,
+                        console=console
+                    )
+                    
+                    # Validate the path
+                    import os
+                    from pathlib import Path
+                    
+                    expanded_path = os.path.expanduser(os.path.expandvars(new_location.strip()))
+                    abs_path = os.path.abspath(expanded_path)
+                    
+                    # Check if parent directory exists or can be created
+                    parent_dir = os.path.dirname(abs_path)
+                    if not os.path.exists(parent_dir):
+                        if Confirm.ask(
+                            f"Parent directory [path]{parent_dir}[/path] doesn't exist. Create it?",
+                            default=True,
+                            console=console
+                        ):
+                            try:
+                                Path(parent_dir).mkdir(parents=True, exist_ok=True)
+                            except OSError as e:
+                                console.print(f"[red]Error creating directory: {e}[/red]")
+                                continue
+                        else:
+                            console.print("[yellow]Please choose a different location.[/yellow]")
+                            continue
+                    
+                    # Save the new location
+                    try:
+                        new_prefs = current_prefs.copy()
+                        new_prefs['default_worktree_location'] = abs_path
+                        config_manager.save_user_preferences(new_prefs)
+                        
+                        console.print(f"[green]Default location updated to:[/green] [cyan]{abs_path}[/cyan]")
+                        break
+                        
+                    except ConfigError as e:
+                        console.print(f"[red]Error saving configuration: {e}[/red]")
+                        continue
+                        
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]Configuration cancelled by user.[/yellow]")
+                    ctx.exit(1)
+                except Exception as e:
+                    console.print(f"[red]Invalid path: {e}[/red]")
+                    continue
+        
+        # Show final configuration
+        console.print()
+        try:
+            final_location = config_manager.get_default_worktree_location()
+            console.print(
+                Panel(
+                    f"[green]Configuration updated successfully![/green]\n\n"
+                    f"Default Worktree Location: [cyan]{final_location}[/cyan]",
+                    title="Configuration Complete",
+                    border_style="green"
+                )
+            )
+        except ConfigError as e:
+            console.print(f"[red]Error reading final configuration: {e}[/red]")
+            ctx.exit(1)
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Configuration cancelled by user.[/yellow]")
+        ctx.exit(1)
+    except Exception as e:
+        console.print(
+            Panel(
+                f"[red]Unexpected error:[/red]\n\n{e}",
+                title="Error",
+                border_style="red"
+            )
+        )
+        ctx.exit(1)
 
 
 def main(args: Optional[list] = None) -> int:

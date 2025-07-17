@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
 
+from .exceptions import ConfigError, ConfigValidationError
+
 
 @dataclass
 class WorktreeConfig:
@@ -354,11 +356,3 @@ class ConfigManager:
         )
 
 
-class ConfigError(Exception):
-    """Exception raised for configuration-related errors."""
-    pass
-
-
-class ConfigValidationError(ConfigError):
-    """Exception raised for configuration validation errors."""
-    pass
