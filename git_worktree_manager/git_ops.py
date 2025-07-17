@@ -1,16 +1,16 @@
 """Git operations module for worktree management."""
 
 import subprocess
-from typing import List, Dict, Optional
 from datetime import datetime
+from typing import Dict, List, Optional
 
-from .models import WorktreeInfo, CommitInfo, DiffSummary
+from .cache import CacheConfig, GitOperationsCache, create_cache_key
+from .error_recovery import get_error_recovery_manager
 from .exceptions import (
     GitRepositoryError,
     git_not_installed_error,
 )
-from .error_recovery import get_error_recovery_manager
-from .cache import GitOperationsCache, CacheConfig, create_cache_key
+from .models import CommitInfo, DiffSummary, WorktreeInfo
 
 
 class GitOperations:

@@ -1,10 +1,11 @@
 """Configuration management for Git Worktree Manager."""
 
 import os
-import toml
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, Optional
+
+import toml
 
 from .exceptions import ConfigError, ConfigValidationError
 
@@ -12,6 +13,7 @@ from .exceptions import ConfigError, ConfigValidationError
 @dataclass
 class WorktreeConfig:
     """Configuration data structure for worktree settings."""
+
     default_path: str
     auto_cleanup: bool = True
 
@@ -19,6 +21,7 @@ class WorktreeConfig:
 @dataclass
 class UIConfig:
     """Configuration data structure for UI settings."""
+
     theme: str = "dark"
     show_progress: bool = True
 
@@ -26,6 +29,7 @@ class UIConfig:
 @dataclass
 class PerformanceConfig:
     """Configuration data structure for performance settings."""
+
     cache_timeout: int = 300
     max_cached_items: int = 100
 
@@ -33,6 +37,7 @@ class PerformanceConfig:
 @dataclass
 class Config:
     """Main configuration data structure."""
+
     worktree: WorktreeConfig
     ui: UIConfig = None
     performance: PerformanceConfig = None
@@ -62,12 +67,12 @@ class ConfigManager:
         """Get the configuration directory path."""
         if custom_dir:
             return Path(custom_dir).expanduser()
-        
+
         # Check environment variable for custom config path
         env_config_path = os.getenv(self.ENV_CONFIG_PATH)
         if env_config_path:
             return Path(env_config_path).expanduser()
-        
+
         # Default to ~/.config/git-worktree-manager
         return Path.home() / ".config" / "git-worktree-manager"
 
@@ -77,7 +82,7 @@ class ConfigManager:
         env_path = os.getenv(self.ENV_WORKTREE_DEFAULT_PATH)
         if env_path:
             return str(Path(env_path).expanduser())
-        
+
         # Load from config file
         config = self.load_config()
         return str(Path(config.worktree.default_path).expanduser())
@@ -99,13 +104,13 @@ class ConfigManager:
             return self._config
 
         try:
-            with open(self._config_file, 'r', encoding='utf-8') as f:
+            with open(self._config_file, encoding="utf-8") as f:
                 config_data = toml.load(f)
-            
+
             self._config = self._parse_config_data(config_data)
             return self._config
-        
-        except (toml.TomlDecodeError, OSError, KeyError) as e:
+
+        except (toml.TomlDecodeError, OSError, KeyError):
             # If config is corrupted, create default and save
             self._config = self._create_default_config()
             self.save_config(self._config)
@@ -115,24 +120,24 @@ class ConfigManager:
         """Save configuration to file."""
         # Validate configuration before saving
         self.validate_config(config)
-        
+
         # Ensure config directory exists
         self._config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Convert config to dictionary
         config_dict = {
             "worktree": asdict(config.worktree),
             "ui": asdict(config.ui),
-            "performance": asdict(config.performance)
+            "performance": asdict(config.performance),
         }
-        
+
         try:
-            with open(self._config_file, 'w', encoding='utf-8') as f:
+            with open(self._config_file, "w", encoding="utf-8") as f:
                 toml.dump(config_dict, f)
-            
+
             # Update cached config
             self._config = config
-            
+
         except OSError as e:
             raise ConfigError(f"Failed to save configuration: {e}")
 
@@ -142,31 +147,31 @@ class ConfigManager:
         return {
             "worktree": asdict(config.worktree),
             "ui": asdict(config.ui),
-            "performance": asdict(config.performance)
+            "performance": asdict(config.performance),
         }
 
     def save_user_preferences(self, prefs: Dict[str, Any]) -> None:
         """Save user preferences from a dictionary."""
         config = self.load_config()
-        
+
         # Update worktree settings
         if "worktree" in prefs:
             for key, value in prefs["worktree"].items():
                 if hasattr(config.worktree, key):
                     setattr(config.worktree, key, value)
-        
+
         # Update UI settings
         if "ui" in prefs:
             for key, value in prefs["ui"].items():
                 if hasattr(config.ui, key):
                     setattr(config.ui, key, value)
-        
+
         # Update performance settings
         if "performance" in prefs:
             for key, value in prefs["performance"].items():
                 if hasattr(config.performance, key):
                     setattr(config.performance, key, value)
-        
+
         self.save_config(config)
 
     def validate_config(self, config: Config) -> None:
@@ -179,21 +184,23 @@ class ConfigManager:
         """Validate worktree configuration."""
         if not worktree_config.default_path:
             raise ConfigValidationError("Worktree default_path cannot be empty")
-        
+
         if not isinstance(worktree_config.default_path, str):
             raise ConfigValidationError("Worktree default_path must be a string")
-        
+
         # Validate path format (basic check)
         try:
             path = Path(worktree_config.default_path).expanduser()
             # Check if path is absolute or starts with ~ (home directory)
-            if not (path.is_absolute() or str(worktree_config.default_path).startswith('~')):
+            if not (
+                path.is_absolute() or str(worktree_config.default_path).startswith("~")
+            ):
                 raise ConfigValidationError(
                     f"Worktree default_path must be absolute or start with ~: {worktree_config.default_path}"
                 )
         except (ValueError, OSError) as e:
             raise ConfigValidationError(f"Invalid worktree default_path: {e}")
-        
+
         if not isinstance(worktree_config.auto_cleanup, bool):
             raise ConfigValidationError("Worktree auto_cleanup must be a boolean")
 
@@ -204,29 +211,41 @@ class ConfigManager:
             raise ConfigValidationError(
                 f"UI theme must be one of {valid_themes}, got: {ui_config.theme}"
             )
-        
+
         if not isinstance(ui_config.show_progress, bool):
             raise ConfigValidationError("UI show_progress must be a boolean")
 
-    def _validate_performance_config(self, performance_config: PerformanceConfig) -> None:
+    def _validate_performance_config(
+        self, performance_config: PerformanceConfig
+    ) -> None:
         """Validate performance configuration."""
         if not isinstance(performance_config.cache_timeout, int):
             raise ConfigValidationError("Performance cache_timeout must be an integer")
-        
+
         if performance_config.cache_timeout < 0:
-            raise ConfigValidationError("Performance cache_timeout must be non-negative")
-        
+            raise ConfigValidationError(
+                "Performance cache_timeout must be non-negative"
+            )
+
         if performance_config.cache_timeout > 86400:  # 24 hours
-            raise ConfigValidationError("Performance cache_timeout cannot exceed 86400 seconds (24 hours)")
-        
+            raise ConfigValidationError(
+                "Performance cache_timeout cannot exceed 86400 seconds (24 hours)"
+            )
+
         if not isinstance(performance_config.max_cached_items, int):
-            raise ConfigValidationError("Performance max_cached_items must be an integer")
-        
+            raise ConfigValidationError(
+                "Performance max_cached_items must be an integer"
+            )
+
         if performance_config.max_cached_items < 1:
-            raise ConfigValidationError("Performance max_cached_items must be at least 1")
-        
+            raise ConfigValidationError(
+                "Performance max_cached_items must be at least 1"
+            )
+
         if performance_config.max_cached_items > 10000:
-            raise ConfigValidationError("Performance max_cached_items cannot exceed 10000")
+            raise ConfigValidationError(
+                "Performance max_cached_items cannot exceed 10000"
+            )
 
     def validate_and_save_preferences(self, prefs: Dict[str, Any]) -> None:
         """Validate and save user preferences with enhanced error handling."""
@@ -236,9 +255,9 @@ class ConfigManager:
             temp_config = Config(
                 worktree=WorktreeConfig(**asdict(config.worktree)),
                 ui=UIConfig(**asdict(config.ui)),
-                performance=PerformanceConfig(**asdict(config.performance))
+                performance=PerformanceConfig(**asdict(config.performance)),
             )
-            
+
             # Apply preferences to temporary config
             if "worktree" in prefs:
                 for key, value in prefs["worktree"].items():
@@ -246,27 +265,29 @@ class ConfigManager:
                         setattr(temp_config.worktree, key, value)
                     else:
                         raise ConfigValidationError(f"Unknown worktree setting: {key}")
-            
+
             if "ui" in prefs:
                 for key, value in prefs["ui"].items():
                     if hasattr(temp_config.ui, key):
                         setattr(temp_config.ui, key, value)
                     else:
                         raise ConfigValidationError(f"Unknown UI setting: {key}")
-            
+
             if "performance" in prefs:
                 for key, value in prefs["performance"].items():
                     if hasattr(temp_config.performance, key):
                         setattr(temp_config.performance, key, value)
                     else:
-                        raise ConfigValidationError(f"Unknown performance setting: {key}")
-            
+                        raise ConfigValidationError(
+                            f"Unknown performance setting: {key}"
+                        )
+
             # Validate the temporary config
             self.validate_config(temp_config)
-            
+
             # If validation passes, save the config
             self.save_config(temp_config)
-            
+
         except (TypeError, ValueError) as e:
             raise ConfigValidationError(f"Invalid preference value: {e}")
 
@@ -278,15 +299,16 @@ class ConfigManager:
     def backup_config(self, backup_path: Optional[str] = None) -> str:
         """Create a backup of the current configuration."""
         if backup_path is None:
-            backup_path = str(self._config_file.with_suffix('.toml.backup'))
-        
+            backup_path = str(self._config_file.with_suffix(".toml.backup"))
+
         backup_file = Path(backup_path)
-        
+
         if not self._config_file.exists():
             raise ConfigError("No configuration file exists to backup")
-        
+
         try:
             import shutil
+
             shutil.copy2(self._config_file, backup_file)
             return str(backup_file)
         except OSError as e:
@@ -295,37 +317,40 @@ class ConfigManager:
     def restore_config(self, backup_path: str) -> None:
         """Restore configuration from a backup file."""
         backup_file = Path(backup_path)
-        
+
         if not backup_file.exists():
             raise ConfigError(f"Backup file does not exist: {backup_path}")
-        
+
         try:
             # Validate the backup file first
-            with open(backup_file, 'r', encoding='utf-8') as f:
+            with open(backup_file, encoding="utf-8") as f:
                 config_data = toml.load(f)
-            
+
             temp_config = self._parse_config_data(config_data)
             self.validate_config(temp_config)
-            
+
             # If validation passes, restore the backup
             import shutil
+
             shutil.copy2(backup_file, self._config_file)
-            
+
             # Clear cached config to force reload
             self._config = None
-            
+
         except (toml.TomlDecodeError, OSError, ConfigValidationError) as e:
             raise ConfigError(f"Failed to restore backup: {e}")
 
     def _create_default_config(self) -> Config:
         """Create default configuration."""
         # Use environment variable if available, otherwise use default
-        default_path = os.getenv(self.ENV_WORKTREE_DEFAULT_PATH, self.DEFAULT_WORKTREE_PATH)
-        
+        default_path = os.getenv(
+            self.ENV_WORKTREE_DEFAULT_PATH, self.DEFAULT_WORKTREE_PATH
+        )
+
         return Config(
             worktree=WorktreeConfig(default_path=default_path),
             ui=UIConfig(),
-            performance=PerformanceConfig()
+            performance=PerformanceConfig(),
         )
 
     def _parse_config_data(self, config_data: Dict[str, Any]) -> Config:
@@ -335,24 +360,19 @@ class ConfigManager:
         if "default_path" not in worktree_data:
             # Use environment variable or default if not in config
             worktree_data["default_path"] = os.getenv(
-                self.ENV_WORKTREE_DEFAULT_PATH, 
-                self.DEFAULT_WORKTREE_PATH
+                self.ENV_WORKTREE_DEFAULT_PATH, self.DEFAULT_WORKTREE_PATH
             )
-        
+
         worktree_config = WorktreeConfig(**worktree_data)
-        
+
         # Parse UI config (optional)
         ui_data = config_data.get("ui", {})
         ui_config = UIConfig(**ui_data)
-        
+
         # Parse performance config (optional)
         performance_data = config_data.get("performance", {})
         performance_config = PerformanceConfig(**performance_data)
-        
+
         return Config(
-            worktree=worktree_config,
-            ui=ui_config,
-            performance=performance_config
+            worktree=worktree_config, ui=ui_config, performance=performance_config
         )
-
-

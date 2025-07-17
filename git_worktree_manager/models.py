@@ -8,6 +8,7 @@ from typing import Optional
 @dataclass
 class WorktreeInfo:
     """Information about a Git worktree."""
+
     path: str
     branch: str
     commit_hash: str
@@ -20,6 +21,7 @@ class WorktreeInfo:
 @dataclass
 class DiffSummary:
     """Summary of differences between branches."""
+
     files_modified: int
     files_added: int
     files_deleted: int
@@ -31,6 +33,7 @@ class DiffSummary:
 @dataclass
 class CommitInfo:
     """Information about a Git commit."""
+
     hash: str
     message: str
     author: str

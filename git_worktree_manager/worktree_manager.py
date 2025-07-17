@@ -1,21 +1,16 @@
 """Core WorktreeManager business logic for Git Worktree Manager."""
 
-import os
-from typing import List, Optional, Dict, Any
 from pathlib import Path
+from typing import Dict, List, Optional
 
-from .models import WorktreeInfo, DiffSummary
-from .git_ops import GitOperations, GitRepositoryError
-from .ui_controller import UIController
-from .config import ConfigManager, ConfigError
-from .exceptions import (
-    WorktreeManagerError,
-    WorktreeCreationError,
-    WorktreeListingError,
-    FileSystemError,
-    UserInputError
-)
+from .config import ConfigError, ConfigManager
 from .error_recovery import get_error_recovery_manager
+from .exceptions import (
+    WorktreeCreationError,
+)
+from .git_ops import GitOperations, GitRepositoryError
+from .models import DiffSummary, WorktreeInfo
+from .ui_controller import UIController
 
 
 class WorktreeManager:
@@ -118,16 +113,15 @@ class WorktreeManager:
             # Create the worktree using error recovery mechanisms
             try:
                 recovery_manager = get_error_recovery_manager()
-                
+
                 def _create_operation():
-                    return self.git_ops.create_worktree(location, branch_name, base_branch)
-                
+                    return self.git_ops.create_worktree(
+                        location, branch_name, base_branch
+                    )
+
                 # Use safe worktree creation with comprehensive error handling
                 recovery_manager.safe_worktree_creation(
-                    _create_operation,
-                    location,
-                    branch_name,
-                    cleanup_on_failure=True
+                    _create_operation, location, branch_name, cleanup_on_failure=True
                 )
             except Exception as e:
                 self.ui_controller.stop_progress()
@@ -396,7 +390,7 @@ class WorktreeManager:
                 has_uncommitted_changes=has_uncommitted,
             )
 
-        except GitRepositoryError as e:
+        except GitRepositoryError:
             # Return basic info if detailed info fails
             return WorktreeInfo(
                 path=location,
