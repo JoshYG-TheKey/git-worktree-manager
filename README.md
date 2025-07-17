@@ -16,7 +16,7 @@ An interactive CLI tool for managing Git worktrees with a beautiful Rich-based i
 
 ```bash
 # Clone and install
-git clone <repository-url>
+git clone https://github.com/JoshYG-TheKey/git-worktree-manager.git
 cd git-worktree-manager
 make install-dev && make setup-alias
 
@@ -36,7 +36,7 @@ gitwm
 ### Option 1: Quick Development Setup (Recommended)
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/JoshYG-TheKey/git-worktree-manager.git
 cd git-worktree-manager
 make install-dev    # Install with dev dependencies
 make setup-alias    # Create 'gitwm' alias
@@ -51,7 +51,7 @@ pip install git-worktree-manager
 ### Option 3: Manual Installation
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/JoshYG-TheKey/git-worktree-manager.git
 cd git-worktree-manager
 pip install -e .
 ```
@@ -342,7 +342,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed gu
 
 Quick contribution setup:
 ```bash
-git clone <repository-url>
+git clone https://github.com/JoshYG-TheKey/git-worktree-manager.git
 cd git-worktree-manager
 make install-dev
 make test

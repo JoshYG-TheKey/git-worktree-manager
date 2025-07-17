@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Git Worktree Manager! This guide 
 
 1. **Clone and setup**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/JoshYG-TheKey/git-worktree-manager.git
    cd git-worktree-manager
    make install-dev
    make setup-alias
