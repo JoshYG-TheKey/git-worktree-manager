@@ -2,8 +2,6 @@
 
 An interactive CLI tool for managing Git worktrees with a beautiful Rich-based interface. Simplify worktree creation, management, and visualization with guided workflows and comprehensive status information.
 
-![Demo](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=Git+Worktree+Manager+Demo)
-
 ## ✨ Features
 
 - **🎯 Interactive Worktree Creation**: Guided workflow for creating new worktrees with branch selection
